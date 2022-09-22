@@ -17,6 +17,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/blang/semver/v4"
@@ -159,7 +160,11 @@ func queryNamespaceMapping(server *Server, namespace string, mapping MetricMapNa
 						continue
 					}
 					// Generate the metric
-					metric = prometheus.MustNewConstMetric(metricMapping.desc, metricMapping.vtype, value, labels...)
+					level.Debug(logger).Log("msg", "Creating metric", "description", metricMapping.desc, "value", value, "labels", strings.Join(labels, ","))
+					metric, err = prometheus.NewConstMetric(metricMapping.desc, metricMapping.vtype, value, labels...)
+					if err != nil {
+						level.Error(logger).Log("Couldn't create metric", "err", err)
+					}
 				}
 			} else {
 				// Unknown metric. Report as untyped if scan to float64 works, else note an error too.
@@ -173,6 +178,7 @@ func queryNamespaceMapping(server *Server, namespace string, mapping MetricMapNa
 					nonfatalErrors = append(nonfatalErrors, errors.New(fmt.Sprintln("Unparseable column type - discarding: ", namespace, columnName, err)))
 					continue
 				}
+				level.Debug(logger).Log("msg", "Creating untyped metric", "description", desc, "value", value, "labels", strings.Join(labels, ","))
 				metric = prometheus.MustNewConstMetric(desc, prometheus.UntypedValue, value, labels...)
 			}
 			metrics = append(metrics, metric)
